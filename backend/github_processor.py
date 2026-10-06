@@ -206,21 +206,42 @@ def scan_and_extract_code(repo_path: str) -> Dict[str, object]:
             "skipped_count": 0,
         }
 
-    # Relative paths for tree view
+    # Relative paths for tree view (all supported files)
     file_tree = sorted(
         str(p.relative_to(repo_path)).replace(os.sep, "/") for p in all_candidate_files
     )
 
-    # Sort files: priority files first, then smaller files
+    # Detect ALL languages across the entire repository
+    all_languages_detected: Set[str] = set()
+    for p in all_candidate_files:
+        lang_name = LANGUAGE_MAP.get(p.suffix.lower())
+        if lang_name:
+            all_languages_detected.add(lang_name)
+
+    # Prioritize code files (.py, .js, .ts, etc.) over purely text/markdown
+    CODE_EXTS = {".py", ".js", ".jsx", ".ts", ".tsx", ".java", ".cpp", ".c", ".go", ".rs", ".cs", ".html"}
+
     def sort_key(p: Path):
         rel = str(p.relative_to(repo_path)).replace(os.sep, "/")
-        is_prio = 0 if _is_priority_file(rel) else 1
-        return (is_prio, p.name)
+        name = p.name.lower()
+        suffix = p.suffix.lower()
+
+        # Priority score (lower number = higher priority)
+        if name in {"main.py", "app.py", "server.py", "index.js", "index.ts"}:
+            score = 0
+        elif suffix in CODE_EXTS:
+            score = 1
+        elif name in {"readme.md"}:
+            score = 2
+        elif name in {"requirements.txt", "package.json", "pyproject.toml"}:
+            score = 3
+        else:
+            score = 4
+        return (score, len(rel))
 
     sorted_files = sorted(all_candidate_files, key=sort_key)
 
     extracted_code: Dict[str, str] = {}
-    languages_detected: Set[str] = set()
     total_chars = 0
     skipped_count = 0
 
@@ -244,10 +265,6 @@ def scan_and_extract_code(repo_path: str) -> Dict[str, object]:
             skipped_count += 1
             continue
 
-        # Add detected language
-        lang_name = LANGUAGE_MAP.get(suffix, suffix)
-        languages_detected.add(lang_name)
-
         # Truncate large single file
         truncated = stripped[:MAX_FILE_CHARS]
         remaining = MAX_TOTAL_CHARS - total_chars
@@ -264,7 +281,7 @@ def scan_and_extract_code(repo_path: str) -> Dict[str, object]:
             "code_files": {},
             "files_analyzed": 0,
             "total_files": total_supported_files,
-            "languages": sorted(list(languages_detected)),
+            "languages": sorted(list(all_languages_detected)),
             "skipped_count": skipped_count,
         }
 
@@ -275,6 +292,6 @@ def scan_and_extract_code(repo_path: str) -> Dict[str, object]:
         "code_files": extracted_code,
         "files_analyzed": len(extracted_code),
         "total_files": total_supported_files,
-        "languages": sorted(list(languages_detected)),
+        "languages": sorted(list(all_languages_detected)),
         "skipped_count": skipped_count,
     }

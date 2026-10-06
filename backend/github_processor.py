@@ -6,8 +6,10 @@ import shutil
 import stat
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple
 from urllib.parse import urlparse
+
+import requests
 
 from git import Repo
 from git.exc import GitCommandError
@@ -295,3 +297,106 @@ def scan_and_extract_code(repo_path: str) -> Dict[str, object]:
         "languages": sorted(list(all_languages_detected)),
         "skipped_count": skipped_count,
     }
+
+
+def fetch_repository_fast(url: str) -> Dict[str, Any] | None:
+    """Fast extraction using the GitHub REST API (sub-second) to avoid cloning if possible."""
+    try:
+        cleaned = url.strip()
+        parsed = urlparse(cleaned)
+        parts = [p for p in parsed.path.strip("/").split("/") if p]
+        if len(parts) < 2:
+            return None
+        owner = parts[0]
+        repo = parts[1].replace(".git", "")
+
+        headers = {"User-Agent": "GitHub-Explainer-App"}
+
+        # 1. Fetch default branch and metadata
+        repo_resp = requests.get(f"https://api.github.com/repos/{owner}/{repo}", headers=headers, timeout=3)
+        if repo_resp.status_code != 200:
+            return None
+        repo_info = repo_resp.json()
+        default_branch = repo_info.get("default_branch", "main")
+
+        # 2. Fetch languages breakdown
+        langs_resp = requests.get(f"https://api.github.com/repos/{owner}/{repo}/languages", headers=headers, timeout=3)
+        languages = list(langs_resp.json().keys()) if langs_resp.status_code == 200 else []
+
+        # 3. Fetch git tree recursively
+        tree_resp = requests.get(
+            f"https://api.github.com/repos/{owner}/{repo}/git/trees/{default_branch}?recursive=1",
+            headers=headers,
+            timeout=3.5,
+        )
+        if tree_resp.status_code != 200:
+            return None
+
+        raw_tree = tree_resp.json().get("tree", [])
+        file_tree = []
+        candidate_files = []
+        for item in raw_tree:
+            if item.get("type") == "blob":
+                path = str(item.get("path", ""))
+                parts_path = path.split("/")
+                if any(ignored in parts_path for ignored in IGNORED_DIRS):
+                    continue
+                file_tree.append(path)
+                ext = "." + path.split(".")[-1].lower() if "." in path else ""
+                if ext in LANGUAGE_MAP:
+                    candidate_files.append(path)
+
+        if not candidate_files and not file_tree:
+            return None
+
+        def sort_priority(p: str) -> int:
+            base = p.split("/")[-1]
+            if base in PRIORITY_FILES:
+                return PRIORITY_FILES.index(base)
+            return 99
+
+        sorted_candidates = sorted(candidate_files, key=sort_priority)
+
+        # 4. Fetch content for top priority files in parallel
+        from concurrent.futures import ThreadPoolExecutor
+
+        top_candidates = sorted_candidates[:MAX_FILES_TO_ANALYZE]
+        extracted_code: Dict[str, str] = {}
+
+        def fetch_file(path: str) -> Tuple[str, str]:
+            try:
+                resp = requests.get(
+                    f"https://raw.githubusercontent.com/{owner}/{repo}/{default_branch}/{path}",
+                    headers=headers,
+                    timeout=2.5,
+                )
+                if resp.status_code == 200 and resp.text.strip():
+                    return path, resp.text.strip()[:MAX_FILE_CHARS]
+            except Exception:
+                pass
+            return path, ""
+
+        with ThreadPoolExecutor(max_workers=min(4, len(top_candidates) or 1)) as executor:
+            results = executor.map(fetch_file, top_candidates)
+            total_chars = 0
+            for path, content in results:
+                if content and total_chars < MAX_TOTAL_CHARS:
+                    extracted_code[path] = content
+                    total_chars += len(content)
+
+        if not extracted_code:
+            return None
+
+        return {
+            "success": True,
+            "error": "",
+            "file_tree": file_tree[:200],
+            "code_files": extracted_code,
+            "files_analyzed": len(extracted_code),
+            "total_files": len(candidate_files) or len(file_tree),
+            "languages": sorted(languages),
+            "skipped_count": 0,
+        }
+    except Exception:
+        return None
+

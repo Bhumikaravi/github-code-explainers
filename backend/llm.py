@@ -130,8 +130,8 @@ def generate_code_explanation(file_tree: List[str], code_files: Dict[str, str]) 
         "stream": False,
         "options": {
             "temperature": 0.2,
-            "num_predict": 450,
-            "num_ctx": 2048,
+            "num_predict": 220,
+            "num_ctx": 1536,
         },
     }
 
@@ -185,38 +185,8 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
         },
     }
 
-    # 1. Dynamically fetch available models for this API key
-    candidate_models: List[str] = []
-    try:
-        list_resp = requests.get(
-            f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}",
-            timeout=10,
-        )
-        if list_resp.status_code == 200:
-            data = list_resp.json()
-            if isinstance(data, dict):
-                for m in data.get("models", []):
-                    if isinstance(m, dict):
-                        methods = m.get("supportedGenerationMethods", [])
-                        if isinstance(methods, list) and "generateContent" in methods:
-                            name = str(m.get("name", "")).replace("models/", "").strip()
-                            if name:
-                                candidate_models.append(name)
-    except Exception:
-        pass
-
-    # Sort candidates: prioritize flash models, then other gemini models
-    if candidate_models:
-        flash_models = [m for m in candidate_models if "flash" in m.lower()]
-        other_models = [m for m in candidate_models if "flash" not in m.lower() and "gemini" in m.lower()]
-        models_to_try = flash_models + other_models
-    else:
-        models_to_try = [
-            "gemini-2.5-flash",
-            "gemini-1.5-flash",
-            "gemini-1.5-flash-latest",
-            "gemini-pro",
-        ]
+    # Try fastest flash models directly first for sub-2s latency
+    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
 
     errors: List[str] = []
     for model_name in models_to_try:

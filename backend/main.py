@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.github_processor import (
     cleanup_repository,
     clone_repository,
+    fetch_repository_fast,
     scan_and_extract_code,
     validate_github_url,
 )
@@ -89,27 +90,31 @@ def explain_repository(request: ExplainRequest):
 
     repo_path: str | None = None
     try:
-        # 3. Clone Repository
-        logger.info("Cloning repository: %s", url)
-        repo_path, clone_err = clone_repository(url)
-        if clone_err:
-            logger.error("Clone error: %s", clone_err)
-            return ExplainResponse(
-                success=False,
-                error=clone_err,
-            )
+        # 3. Attempt fast extraction via GitHub API (sub-second)
+        logger.info("Attempting fast extraction for: %s", url)
+        extracted = fetch_repository_fast(url)
 
-        # 4. Scan files and extract source code
-        logger.info("Scanning and extracting source files from %s", repo_path)
-        extracted = scan_and_extract_code(repo_path)
-        if not extracted.get("success"):
-            error_msg = str(extracted.get("error", "No supported source-code files were found in this repository."))
-            logger.warning("Code extraction issue: %s", error_msg)
-            return ExplainResponse(
-                success=False,
-                error=error_msg,
-                total_files=int(extracted.get("total_files", 0)),
-            )
+        if not extracted or not extracted.get("success"):
+            # Fallback to local clone
+            logger.info("Cloning repository: %s", url)
+            repo_path, clone_err = clone_repository(url)
+            if clone_err:
+                logger.error("Clone error: %s", clone_err)
+                return ExplainResponse(
+                    success=False,
+                    error=clone_err,
+                )
+
+            logger.info("Scanning and extracting source files from %s", repo_path)
+            extracted = scan_and_extract_code(repo_path)
+            if not extracted.get("success"):
+                error_msg = str(extracted.get("error", "No supported source-code files were found in this repository."))
+                logger.warning("Code extraction issue: %s", error_msg)
+                return ExplainResponse(
+                    success=False,
+                    error=error_msg,
+                    total_files=int(extracted.get("total_files", 0)),
+                )
 
         file_tree = list(extracted.get("file_tree", []))
         code_files = dict(extracted.get("code_files", {}))

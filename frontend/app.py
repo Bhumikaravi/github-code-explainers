@@ -22,31 +22,87 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 
 st.set_page_config(
     page_title="GitHub Repository Code Explainer",
-    page_icon="💻",
     layout="centered",
 )
 
 st.markdown(
     """
     <style>
-    .main-header {
-        text-align: center;
-        padding-bottom: 1rem;
+    /* Main application peach background */
+    .stApp {
+        background-color: #FFF3EB;
+        color: #2D2320;
     }
-    .metric-badge {
-        background-color: #f0f2f6;
+
+    [data-testid="stHeader"] {
+        background-color: transparent;
+    }
+
+    /* Metric cards styling */
+    div[data-testid="stMetric"] {
+        background-color: #FFFFFF;
+        border: 1px solid #F5C6AA;
+        border-radius: 10px;
+        padding: 12px 18px;
+        box-shadow: 0 1px 4px rgba(45, 35, 32, 0.05);
+    }
+
+    div[data-testid="stMetricValue"] {
+        color: #C85A32;
+    }
+
+    /* Primary buttons */
+    button[kind="primary"] {
+        background-color: #E07A5F !important;
+        border-color: #E07A5F !important;
+        color: #FFFFFF !important;
+        font-weight: 600;
         border-radius: 8px;
-        padding: 8px 14px;
-        display: inline-block;
-        margin-right: 8px;
-        font-weight: 500;
+    }
+
+    button[kind="primary"]:hover {
+        background-color: #C85A32 !important;
+        border-color: #C85A32 !important;
+    }
+
+    /* Secondary / standard buttons */
+    button[kind="secondary"] {
+        background-color: #FFE5D4 !important;
+        border: 1px solid #F5C6AA !important;
+        color: #2D2320 !important;
+        border-radius: 8px;
+    }
+
+    button[kind="secondary"]:hover {
+        background-color: #FCD6BE !important;
+        border-color: #E07A5F !important;
+    }
+
+    /* Form input styling */
+    div[data-testid="stTextInput"] input {
+        background-color: #FFFFFF;
+        color: #2D2320;
+        border: 1px solid #F0C4AB;
+        border-radius: 8px;
+    }
+
+    div[data-testid="stTextInput"] input:focus {
+        border-color: #E07A5F;
+        box-shadow: 0 0 0 1px #E07A5F;
+    }
+
+    /* Expander header styling */
+    .streamlit-expanderHeader {
+        background-color: #FFEADB;
+        border-radius: 8px;
+        color: #2D2320;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.title("💻 GitHub Repository Code Explainer")
+st.title("GitHub Repository Code Explainer")
 st.write(
     "Enter a public GitHub repository URL and get a simple AI-generated explanation of its codebase."
 )
@@ -87,17 +143,17 @@ if not gemini_key:
 
 # Status banner
 if gemini_key:
-    st.success("☁️ **Cloud Mode Ready:** Connected to Gemini AI via Streamlit Cloud Secrets.")
+    st.success("**Cloud Mode Ready:** Connected to Gemini AI via Streamlit Cloud Secrets.")
 elif not backend_online:
     st.warning(
-        "⚠️ **FastAPI Backend is not running.**\n\n"
+        "**FastAPI Backend is not running.**\n\n"
         "- **For Local Mode (Laptop)**: Start backend with `uvicorn backend.main:app --reload`\n"
         "- **For Cloud Mode (Streamlit Cloud)**: Add `GEMINI_API_KEY = \"YOUR_KEY\"` in Streamlit Cloud Secrets."
     )
 elif not ollama_ready:
-    st.warning(f"⚠️ **Backend is online, but Local LLM is not ready:**\n\n{health_message}")
+    st.warning(f"**Backend is online, but Local LLM is not ready:**\n\n{health_message}")
 else:
-    st.success(f"✅ **Local Mode Ready:** FastAPI Backend and Local LLM ({active_model_name}) are connected.")
+    st.success(f"**Local Mode Ready:** FastAPI Backend and Local LLM ({active_model_name}) are connected.")
 
 # Input Form
 with st.form("repo_form"):
@@ -130,8 +186,8 @@ if submit_button:
     status_box = st.status("Analyzing repository...", expanded=True)
 
     with status_box:
-        st.write("🔗 Cloning repository...")
-        st.write("📂 Scanning and detecting languages across repository...")
+        st.write("Cloning repository...")
+        st.write("Scanning and detecting languages across repository...")
 
         if gemini_key:
             # === CLOUD MODE (Gemini AI on Streamlit Cloud) ===
@@ -155,7 +211,7 @@ if submit_button:
                 total_files = int(extracted.get("total_files", 0))
                 languages = list(extracted.get("languages", []))
 
-                st.write(f"🧠 Generating explanation with Cloud AI (Gemini)...")
+                st.write("Generating explanation with Cloud AI (Gemini)...")
                 explanation = generate_gemini_explanation(file_tree, code_files, gemini_key)
 
                 status_box.update(label="Analysis complete!", state="complete", expanded=False)
@@ -178,8 +234,8 @@ if submit_button:
 
         else:
             # === LOCAL MODE (FastAPI + Ollama) ===
-            st.write("🧠 Preparing code for Local LLM...")
-            st.write("✨ Generating explanation via Local LLM...")
+            st.write("Preparing code for Local LLM...")
+            st.write("Generating explanation via Local LLM...")
             try:
                 response = requests.post(
                     f"{BACKEND_URL}/explain",
@@ -238,7 +294,7 @@ if "result_data" in st.session_state:
     data = st.session_state["result_data"]
 
     st.markdown("---")
-    st.subheader("📊 Analysis Summary")
+    st.subheader("Analysis Summary")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -248,24 +304,24 @@ if "result_data" in st.session_state:
         st.metric("Languages Detected", lang_str)
 
     st.markdown("---")
-    st.subheader("📘 Project Explanation")
+    st.subheader("Project Explanation")
     st.markdown(data["explanation"])
 
     # File tree expander
     if data["file_list"]:
-        with st.expander(f"📁 Repository Files List ({len(data['file_list'])})"):
+        with st.expander(f"Repository Files List ({len(data['file_list'])})"):
             st.code("\n".join(data["file_list"]), language="text")
 
     # Download button
     st.download_button(
-        label="⬇️ Download Explanation as Markdown",
+        label="Download Explanation as Markdown",
         data=data["explanation"],
         file_name="repository_explanation.md",
         mime="text/markdown",
         use_container_width=True,
     )
 
-    if st.button("🔄 Clear Result", use_container_width=True):
+    if st.button("Clear Result", use_container_width=True):
         del st.session_state["result_data"]
         st.rerun()
 

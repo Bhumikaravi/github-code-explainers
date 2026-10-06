@@ -27,3 +27,5 @@ github_code_explainer_*
 .idea/
 .DS_Store
 Thumbs.db
+
+*.exe

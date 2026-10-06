@@ -173,6 +173,44 @@ def generate_code_explanation(file_tree: List[str], code_files: Dict[str, str]) 
     return explanation_raw.strip()
 
 
+_GEMINI_MODEL_CACHE: Dict[str, List[str]] = {}
+
+
+def get_available_gemini_models(clean_key: str) -> List[str]:
+    """Queries Google Gemini API dynamically to discover available models for this specific API key."""
+    if clean_key in _GEMINI_MODEL_CACHE and _GEMINI_MODEL_CACHE[clean_key]:
+        return _GEMINI_MODEL_CACHE[clean_key]
+
+    discovered: List[str] = []
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
+        res = requests.get(url, timeout=8)
+        if res.status_code == 200:
+            data = res.json()
+            if isinstance(data, dict):
+                for m in data.get("models", []):
+                    if isinstance(m, dict):
+                        methods = m.get("supportedGenerationMethods", [])
+                        if isinstance(methods, list) and "generateContent" in methods:
+                            name = str(m.get("name", "")).replace("models/", "").strip()
+                            if name:
+                                discovered.append(name)
+    except Exception:
+        pass
+
+    # Prioritize flash models, then other gemini models
+    flash_models = [m for m in discovered if "flash" in m.lower()]
+    other_models = [m for m in discovered if "flash" not in m.lower() and "gemini" in m.lower()]
+    candidates = flash_models + other_models
+    if not candidates and discovered:
+        candidates = discovered
+    if not candidates:
+        candidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-pro"]
+
+    _GEMINI_MODEL_CACHE[clean_key] = candidates
+    return candidates
+
+
 def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str], api_key: str) -> str:
     """Generates an explanation using Google Gemini API for standalone cloud deployments."""
     clean_key = api_key.strip().strip('"').strip("'")
@@ -181,18 +219,17 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 400,
+            "maxOutputTokens": 450,
         },
     }
 
-    # Try fastest flash models directly first for sub-2s latency
-    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
+    models_to_try = get_available_gemini_models(clean_key)
 
     errors: List[str] = []
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={clean_key}"
         try:
-            resp = requests.post(url, json=payload, timeout=60)
+            resp = requests.post(url, json=payload, timeout=25)
             if resp.status_code == 200:
                 data = resp.json()
                 if isinstance(data, dict):

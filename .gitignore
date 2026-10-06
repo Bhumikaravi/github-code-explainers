@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment Variables & Secrets
+.env
+.streamlit/secrets.toml
+
+# Cloned Repositories & Temporary Files
+temp/
+tmp/
+cloned_repositories/
+github_repo_*
+github_code_explainer_*
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

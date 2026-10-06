@@ -175,6 +175,7 @@ def generate_code_explanation(file_tree: List[str], code_files: Dict[str, str]) 
 
 def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str], api_key: str) -> str:
     """Generates an explanation using Google Gemini API for standalone cloud deployments."""
+    clean_key = api_key.strip().strip('"').strip("'")
     prompt = build_explanation_prompt(file_tree, code_files)
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -184,16 +185,42 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
         },
     }
 
-    models_to_try = [
-        "gemini-3.8-flash",
-        "gemini-2.5-flash",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-    ]
-    last_err = ""
+    # 1. Dynamically fetch available models for this API key
+    candidate_models: List[str] = []
+    try:
+        list_resp = requests.get(
+            f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}",
+            timeout=10,
+        )
+        if list_resp.status_code == 200:
+            data = list_resp.json()
+            if isinstance(data, dict):
+                for m in data.get("models", []):
+                    if isinstance(m, dict):
+                        methods = m.get("supportedGenerationMethods", [])
+                        if isinstance(methods, list) and "generateContent" in methods:
+                            name = str(m.get("name", "")).replace("models/", "").strip()
+                            if name:
+                                candidate_models.append(name)
+    except Exception:
+        pass
 
+    # Sort candidates: prioritize flash models, then other gemini models
+    if candidate_models:
+        flash_models = [m for m in candidate_models if "flash" in m.lower()]
+        other_models = [m for m in candidate_models if "flash" not in m.lower() and "gemini" in m.lower()]
+        models_to_try = flash_models + other_models
+    else:
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-pro",
+        ]
+
+    errors: List[str] = []
     for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key.strip()}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={clean_key}"
         try:
             resp = requests.post(url, json=payload, timeout=60)
             if resp.status_code == 200:
@@ -212,8 +239,8 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
                                         text = part.get("text", "")
                                         if text and isinstance(text, str) and text.strip():
                                             return text.strip()
-            last_err = f"Gemini ({model_name}) HTTP {resp.status_code}: {resp.text}"
+            errors.append(f"{model_name} (HTTP {resp.status_code})")
         except Exception as exc:
-            last_err = f"Gemini connection error: {str(exc)}"
+            errors.append(f"{model_name} (error: {str(exc)})")
 
-    raise RuntimeError(f"Cloud AI failed: {last_err}")
+    raise RuntimeError(f"Cloud AI failed on models: {', '.join(errors)}")

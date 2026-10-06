@@ -141,19 +141,15 @@ if not gemini_key:
     except Exception:
         backend_online = False
 
-# Status banner
-if gemini_key:
-    st.success("**Cloud Mode Ready:** Connected to Gemini AI via Streamlit Cloud Secrets.")
-elif not backend_online:
+# Status banner (only displays if service is unavailable)
+if not gemini_key and not backend_online:
     st.warning(
-        "**FastAPI Backend is not running.**\n\n"
-        "- **For Local Mode (Laptop)**: Start backend with `uvicorn backend.main:app --reload`\n"
-        "- **For Cloud Mode (Streamlit Cloud)**: Add `GEMINI_API_KEY = \"YOUR_KEY\"` in Streamlit Cloud Secrets."
+        "FastAPI Backend is not running.\n\n"
+        "- For Local Mode (Laptop): Start backend with `uvicorn backend.main:app --reload`\n"
+        "- For Cloud Mode (Streamlit Cloud): Add `GEMINI_API_KEY` in Streamlit Cloud Secrets."
     )
-elif not ollama_ready:
-    st.warning(f"**Backend is online, but Local LLM is not ready:**\n\n{health_message}")
-else:
-    st.success(f"**Local Mode Ready:** FastAPI Backend and Local LLM ({active_model_name}) are connected.")
+elif not gemini_key and not ollama_ready:
+    st.warning(f"Backend is online, but Local LLM is not ready:\n\n{health_message}")
 
 # Input Form
 with st.form("repo_form"):

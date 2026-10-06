@@ -24,7 +24,8 @@ BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 
 st.set_page_config(
     page_title="GitHub Repository Code Explainer",
-    layout="wide",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
 # Custom Styling: Warm Peach Theme
@@ -37,18 +38,9 @@ st.markdown(
         color: #2D2320 !important;
     }
 
-    [data-testid="stSidebar"] {
-        background-color: #FFEADB !important;
-        border-right: 1px solid #F5C6AA !important;
-    }
-
-    [data-testid="stSidebar"] * {
-        color: #2D2320 !important;
-    }
-
-    [data-testid="stSidebar"] code {
-        background-color: #FFF3EB !important;
-        color: #A34828 !important;
+    /* Completely Remove Left Sidebar and Sidebar Toggle */
+    [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+        display: none !important;
     }
 
     [data-testid="stHeader"] {
@@ -216,27 +208,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ----------------- SIDEBAR: Local Ollama Setup -----------------
-with st.sidebar:
-    st.subheader("Local Ollama Setup")
-    st.write("Every user uses their own local AI model:")
-    
-    st.markdown("**1. Install Ollama** from [ollama.com](https://ollama.com).")
-    
-    st.markdown("**2. Download Qwen 2.5:**")
-    st.code("ollama pull qwen2.5-coder:1.5b", language="bash")
-    
-    st.markdown("**3. Start Ollama with Browser Access:**")
-    st.caption("Windows (PowerShell):")
-    st.code('$env:OLLAMA_ORIGINS="*"\nollama serve', language="powershell")
-    st.caption("Mac / Linux:")
-    st.code('OLLAMA_ORIGINS="*" ollama serve', language="bash")
-    
-    st.markdown("**4. Paste any public repository URL, and analyze!**")
-    
-    st.markdown("---")
-    st.caption("No external server dependencies or rate limits when running locally.")
-
 # ----------------- BACKEND & PROVIDER DETECTION -----------------
 gemini_key = None
 try:
@@ -301,18 +272,11 @@ st.markdown(
 # ----------------- INPUT SECTION -----------------
 st.markdown('<div class="section-title">Analyze Any Public GitHub Repository</div>', unsafe_allow_html=True)
 
-col_input, col_btn = st.columns([4, 1])
-
-with col_input:
-    repo_url = st.text_input(
-        "Enter Public GitHub Repository URL:",
-        placeholder="https://github.com/Bhumikaravi/github-code-explainers",
-        label_visibility="visible",
-    )
-
-with col_btn:
-    st.write("<div style='height: 28px'></div>", unsafe_allow_html=True)
-    analyze_clicked = st.button("Analyze Repository", type="primary", use_container_width=True)
+repo_url = st.text_input(
+    "Enter Public GitHub Repository URL:",
+    placeholder="https://github.com/Bhumikaravi/github-code-explainers",
+)
+analyze_clicked = st.button("Analyze Repository", type="primary", use_container_width=True)
 
 # Helpers for classification and structure
 def parse_repo_owner_name(url: str) -> tuple[str, str]:

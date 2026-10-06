@@ -360,7 +360,7 @@ def fetch_repository_fast(url: str) -> Dict[str, Any] | None:
         # 4. Fetch content for top priority files in parallel
         from concurrent.futures import ThreadPoolExecutor
 
-        top_candidates = sorted_candidates[:MAX_FILES_TO_ANALYZE]
+        top_candidates = sorted_candidates[:2]
         extracted_code: Dict[str, str] = {}
 
         def fetch_file(path: str) -> Tuple[str, str]:

@@ -27,44 +27,57 @@ st.set_page_config(
     layout="wide",
 )
 
-# Custom Styling matching modern dark theme
+# Custom Styling: Warm Peach Theme
 st.markdown(
     """
     <style>
-    /* Dark Theme Base */
+    /* Main App Peach Theme */
     .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
+        background-color: #FFF3EB !important;
+        color: #2D2320 !important;
     }
 
     [data-testid="stSidebar"] {
-        background-color: #161B22;
-        border-right: 1px solid #30363D;
+        background-color: #FFEADB !important;
+        border-right: 1px solid #F5C6AA !important;
     }
 
-    /* Main Title */
+    [data-testid="stSidebar"] * {
+        color: #2D2320 !important;
+    }
+
+    [data-testid="stSidebar"] code {
+        background-color: #FFF3EB !important;
+        color: #A34828 !important;
+    }
+
+    [data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+
+    /* Main Title & Typography */
     .hero-title {
         font-size: 2.2rem;
         font-weight: 800;
         letter-spacing: -0.5px;
         margin-bottom: 4px;
-        color: #FAFAFA;
+        color: #2D2320;
         text-transform: uppercase;
     }
 
     .hero-subtitle {
         font-size: 1.05rem;
-        color: #8B949E;
+        color: #6E534B;
         margin-bottom: 24px;
     }
 
-    /* Status Cards */
+    /* Status Badges */
     .status-card-container {
         display: flex;
         align-items: center;
         gap: 12px;
         flex-wrap: wrap;
-        margin-bottom: 28px;
+        margin-bottom: 24px;
     }
 
     .status-badge {
@@ -78,37 +91,49 @@ st.markdown(
     }
 
     .badge-ollama {
-        background-color: #2E2614;
-        color: #E3B341;
-        border: 1px solid #5A471C;
+        background-color: #FFE6D5;
+        color: #9A4325;
+        border: 1px solid #F4C4A8;
     }
 
     .badge-model {
-        background-color: #14283D;
-        color: #58A6FF;
-        border: 1px solid #1F4A75;
+        background-color: #FEDDCC;
+        color: #8C3B1E;
+        border: 1px solid #F2BBA0;
     }
 
     .status-note {
-        font-size: 0.82rem;
-        color: #8B949E;
-        max-width: 460px;
+        font-size: 0.85rem;
+        color: #6E534B;
+        max-width: 480px;
         line-height: 1.35;
     }
 
-    /* Input section */
+    /* Input Section */
     .section-title {
         font-size: 1.35rem;
         font-weight: 700;
         margin-top: 10px;
         margin-bottom: 12px;
-        color: #FAFAFA;
+        color: #2D2320;
     }
 
-    /* Action button */
+    div[data-testid="stTextInput"] input {
+        background-color: #FFFFFF !important;
+        color: #2D2320 !important;
+        border: 1px solid #EBB89E !important;
+        border-radius: 8px !important;
+    }
+
+    div[data-testid="stTextInput"] input:focus {
+        border-color: #E07A5F !important;
+        box-shadow: 0 0 0 1px #E07A5F !important;
+    }
+
+    /* Primary Action Button */
     div.stButton > button {
-        background-color: #FF4B4B !important;
-        border-color: #FF4B4B !important;
+        background-color: #E07A5F !important;
+        border-color: #E07A5F !important;
         color: #FFFFFF !important;
         font-weight: 600;
         border-radius: 8px;
@@ -116,18 +141,18 @@ st.markdown(
     }
 
     div.stButton > button:hover {
-        background-color: #E03E3E !important;
-        border-color: #E03E3E !important;
+        background-color: #C85A32 !important;
+        border-color: #C85A32 !important;
     }
 
-    /* Timing banner */
+    /* Timing Banner */
     .timing-banner {
-        background-color: #162419;
-        border: 1px solid #238636;
-        color: #3FB950;
+        background-color: #E9F7EF;
+        border: 1px solid #82C99B;
+        color: #1E6B37;
         padding: 10px 16px;
         border-radius: 8px;
-        font-weight: 500;
+        font-weight: 600;
         font-size: 0.95rem;
         margin-top: 14px;
         margin-bottom: 20px;
@@ -136,53 +161,55 @@ st.markdown(
     /* Repository Overview Banner */
     .repo-banner {
         margin-top: 10px;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
 
     .repo-heading {
-        font-size: 1.7rem;
+        font-size: 1.6rem;
         font-weight: 700;
-        color: #FAFAFA;
+        color: #2D2320;
     }
 
     .repo-meta {
         font-size: 0.95rem;
-        color: #8B949E;
+        color: #6E534B;
         margin-top: 4px;
     }
 
     .repo-meta a {
-        color: #58A6FF;
+        color: #D45D3B;
         text-decoration: none;
+        font-weight: 500;
     }
 
-    /* Metric cards in tabs */
+    /* Metric Cards */
     div[data-testid="stMetric"] {
-        background-color: #161B22;
-        border: 1px solid #30363D;
-        border-radius: 10px;
-        padding: 14px 18px;
+        background-color: #FFFFFF !important;
+        border: 1px solid #F5C6AA !important;
+        border-radius: 10px !important;
+        padding: 14px 18px !important;
+        box-shadow: 0 1px 4px rgba(45, 35, 32, 0.05);
     }
 
     div[data-testid="stMetricValue"] {
-        color: #FAFAFA;
+        color: #C85A32 !important;
     }
 
-    /* Code and tabs */
+    /* Tabs */
     .stTabs [data-baseweb="tab-list"] {
         gap: 16px;
-        border-bottom: 1px solid #30363D;
+        border-bottom: 1px solid #F3D0BC;
     }
 
     .stTabs [data-baseweb="tab"] {
-        color: #8B949E;
+        color: #6E534B;
         font-weight: 500;
         padding-bottom: 10px;
     }
 
     .stTabs [aria-selected="true"] {
-        color: #FF4B4B !important;
-        border-bottom-color: #FF4B4B !important;
+        color: #E07A5F !important;
+        border-bottom-color: #E07A5F !important;
     }
     </style>
     """,
@@ -327,12 +354,12 @@ def build_structure_overview(file_tree: list[str]) -> str:
             root_files.append(parts[0])
 
     lines = []
-    lines.append("📁 Root Directory")
+    lines.append("[Root Directory]")
     for d in sorted(top_dirs):
-        lines.append(f"  ├── 📁 {d}")
+        lines.append(f"  ├── [DIR] {d}")
     for idx, f in enumerate(sorted(root_files)):
         prefix = "  └── " if idx == len(root_files) - 1 else "  ├── "
-        lines.append(f"{prefix}📄 {f}")
+        lines.append(f"{prefix}{f}")
     return "\n".join(lines)
 
 # ----------------- EXECUTION FLOW -----------------
@@ -431,7 +458,7 @@ if "result_data" in st.session_state:
 
     # Timing notification
     st.markdown(
-        f'<div class="timing-banner">✓ Analysis complete in {data["elapsed"]:.2f}s!</div>',
+        f'<div class="timing-banner">Analysis complete in {data["elapsed"]:.2f}s!</div>',
         unsafe_allow_html=True,
     )
 

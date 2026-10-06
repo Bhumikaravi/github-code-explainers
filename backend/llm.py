@@ -181,7 +181,7 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.2,
-            "maxOutputTokens": 2048,
+            "maxOutputTokens": 400,
         },
     }
 

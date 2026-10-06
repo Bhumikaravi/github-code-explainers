@@ -184,7 +184,12 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
         },
     }
 
-    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"]
+    models_to_try = [
+        "gemini-3.8-flash",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+    ]
     last_err = ""
 
     for model_name in models_to_try:

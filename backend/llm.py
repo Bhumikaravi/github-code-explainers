@@ -171,3 +171,44 @@ def generate_code_explanation(file_tree: List[str], code_files: Dict[str, str]) 
         raise RuntimeError("The local LLM returned an empty response. Please try again.")
 
     return explanation_raw.strip()
+
+
+def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str], api_key: str) -> str:
+    """Generates an explanation using Google Gemini API for standalone cloud deployments."""
+    prompt = build_explanation_prompt(file_tree, code_files)
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 2048,
+        },
+    }
+
+    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"]
+    last_err = ""
+
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key.strip()}"
+        try:
+            resp = requests.post(url, json=payload, timeout=60)
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, dict):
+                    candidates = data.get("candidates", [])
+                    if isinstance(candidates, list) and len(candidates) > 0:
+                        candidate = candidates[0]
+                        if isinstance(candidate, dict):
+                            content = candidate.get("content", {})
+                            if isinstance(content, dict):
+                                parts = content.get("parts", [])
+                                if isinstance(parts, list) and len(parts) > 0:
+                                    part = parts[0]
+                                    if isinstance(part, dict):
+                                        text = part.get("text", "")
+                                        if text and isinstance(text, str) and text.strip():
+                                            return text.strip()
+            last_err = f"Gemini ({model_name}) HTTP {resp.status_code}: {resp.text}"
+        except Exception as exc:
+            last_err = f"Gemini connection error: {str(exc)}"
+
+    raise RuntimeError(f"Cloud AI failed: {last_err}")

@@ -43,6 +43,7 @@ st.write(
 backend_online = False
 ollama_ready = False
 health_message = ""
+active_model_name = "local LLM"
 
 try:
     health_resp = requests.get(f"{BACKEND_URL}/health", timeout=3)
@@ -52,6 +53,7 @@ try:
             backend_online = True
             ollama_ready = bool(health_data.get("ollama_ready", False))
             health_message = str(health_data.get("message", ""))
+            active_model_name = str(health_data.get("model", "qwen2.5-coder:1.5b"))
 except Exception:
     backend_online = False
 
@@ -68,7 +70,7 @@ if not backend_online:
 elif not ollama_ready:
     st.warning(f"⚠️ **Backend is online, but Local LLM is not ready:**\n\n{health_message}")
 else:
-    st.success("✅ **System Ready:** FastAPI Backend and Local LLM (qwen2.5:3b) are connected.")
+    st.success(f"✅ **System Ready:** FastAPI Backend and Local LLM ({active_model_name}) are connected.")
 
 # Input Form
 with st.form("repo_form"):

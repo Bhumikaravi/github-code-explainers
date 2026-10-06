@@ -6,12 +6,33 @@ from typing import Dict, List, Tuple
 import requests
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
-TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "240"))
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:1.5b")
+FALLBACK_MODEL = "qwen2.5:3b"
+TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "180"))
+
+
+def get_active_model() -> str:
+    """Returns the fastest available installed model (preferring lightweight coder 1.5b)."""
+    try:
+        response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, dict):
+                models = [
+                    m.get("name", "")
+                    for m in data.get("models", [])
+                    if isinstance(m, dict) and isinstance(m.get("name"), str)
+                ]
+                for candidate in [OLLAMA_MODEL, FALLBACK_MODEL]:
+                    if any(m == candidate or m.startswith(f"{candidate}:") for m in models):
+                        return candidate
+    except Exception:
+        pass
+    return OLLAMA_MODEL
 
 
 def check_ollama_status() -> Tuple[bool, str]:
-    """Verifies that Ollama is running and that the configured model is installed."""
+    """Verifies that Ollama is running and that a supported model is installed."""
     try:
         response = requests.get(f"{OLLAMA_URL}/api/tags", timeout=5)
     except requests.exceptions.ConnectionError:
@@ -49,11 +70,9 @@ def check_ollama_status() -> Tuple[bool, str]:
             if isinstance(name, str):
                 installed_names.append(name)
 
-    # Check if configured model or model:tag exists
+    active = get_active_model()
     model_found = any(
-        name == OLLAMA_MODEL
-        or name.startswith(f"{OLLAMA_MODEL}:")
-        or (":" in OLLAMA_MODEL and name == OLLAMA_MODEL)
+        name == active or name.startswith(f"{active}:")
         for name in installed_names
     )
 
@@ -63,12 +82,12 @@ def check_ollama_status() -> Tuple[bool, str]:
             f"The required Ollama model is not installed.\n\nPlease run:\nollama pull {OLLAMA_MODEL}",
         )
 
-    return True, f"Local model '{OLLAMA_MODEL}' is ready."
+    return True, f"Local model '{active}' is ready."
 
 
 def build_explanation_prompt(file_tree: List[str], code_files: Dict[str, str]) -> str:
     """Builds a structured prompt for the local LLM following exact assignment requirements."""
-    tree_lines = file_tree[:100]
+    tree_lines = file_tree[:60]
     tree_text = "\n".join(tree_lines) if tree_lines else "No directory tree available."
 
     code_sections = []
@@ -86,7 +105,7 @@ The explanation MUST include these exact headings:
 ## Important Files
 ## Simple Explanation
 
-Base your entire explanation strictly on the provided repository contents.
+Keep each section concise, direct, and under 3-4 sentences.
 
 ### REPOSITORY FILE TREE:
 {tree_text}
@@ -98,20 +117,21 @@ Base your entire explanation strictly on the provided repository contents.
 
 def generate_code_explanation(file_tree: List[str], code_files: Dict[str, str]) -> str:
     """Sends the structured code context to the local Ollama LLM and safely extracts the explanation."""
-    # First check Ollama availability
     is_ready, status_msg = check_ollama_status()
     if not is_ready:
         raise RuntimeError(status_msg)
 
+    active_model = get_active_model()
     prompt = build_explanation_prompt(file_tree, code_files)
 
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": active_model,
         "prompt": prompt,
         "stream": False,
         "options": {
             "temperature": 0.2,
-            "num_ctx": 4096,
+            "num_predict": 450,
+            "num_ctx": 2048,
         },
     }
 

@@ -14,6 +14,7 @@ from backend.llm import (
     OLLAMA_MODEL,
     check_ollama_status,
     generate_code_explanation,
+    get_active_model,
 )
 from backend.models import ExplainRequest, ExplainResponse, HealthResponse
 
@@ -53,10 +54,11 @@ def root():
 def health_check():
     """Checks whether the backend and the local Ollama LLM are reachable and ready."""
     is_ready, message = check_ollama_status()
+    active_model = get_active_model()
     return HealthResponse(
         status="ok" if is_ready else "degraded",
         ollama_ready=is_ready,
-        model=OLLAMA_MODEL,
+        model=active_model,
         message=message,
     )
 

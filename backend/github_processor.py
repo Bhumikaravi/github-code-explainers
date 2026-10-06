@@ -79,9 +79,9 @@ PRIORITY_FILES: List[str] = [
     "index.ts",
 ]
 
-MAX_FILES_TO_ANALYZE = 10
-MAX_FILE_CHARS = 2500
-MAX_TOTAL_CHARS = 9000
+MAX_FILES_TO_ANALYZE = 6
+MAX_FILE_CHARS = 1200
+MAX_TOTAL_CHARS = 4500
 
 
 def validate_github_url(url: str) -> Tuple[bool, str]:

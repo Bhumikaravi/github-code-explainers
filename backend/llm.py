@@ -182,30 +182,44 @@ def get_available_gemini_models(clean_key: str) -> List[str]:
         return _GEMINI_MODEL_CACHE[clean_key]
 
     discovered: List[str] = []
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={clean_key}"
-        res = requests.get(url, timeout=8)
-        if res.status_code == 200:
-            data = res.json()
-            if isinstance(data, dict):
-                for m in data.get("models", []):
-                    if isinstance(m, dict):
-                        methods = m.get("supportedGenerationMethods", [])
-                        if isinstance(methods, list) and "generateContent" in methods:
-                            name = str(m.get("name", "")).replace("models/", "").strip()
-                            if name:
-                                discovered.append(name)
-    except Exception:
-        pass
+    auth_error: str = ""
 
-    # Prioritize flash models, then other gemini models
+    # Check v1beta endpoint first, then v1
+    for api_version in ["v1beta", "v1"]:
+        try:
+            url = f"https://generativelanguage.googleapis.com/{api_version}/models?key={clean_key}"
+            res = requests.get(url, timeout=8)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, dict):
+                    for m in data.get("models", []):
+                        if isinstance(m, dict):
+                            methods = m.get("supportedGenerationMethods", [])
+                            if isinstance(methods, list) and "generateContent" in methods:
+                                name = str(m.get("name", "")).replace("models/", "").strip()
+                                if name and name not in discovered:
+                                    discovered.append(name)
+            elif res.status_code in (400, 403):
+                try:
+                    err_json = res.json()
+                    err_msg = err_json.get("error", {}).get("message", "")
+                except Exception:
+                    err_msg = res.text
+                auth_error = f"HTTP {res.status_code}: {err_msg}"
+        except Exception:
+            pass
+
+    if not discovered and auth_error:
+        raise RuntimeError(f"Google Gemini API Key invalid or expired ({auth_error}). Please check GEMINI_API_KEY in Streamlit Secrets.")
+
+    # Prioritize newest flash models
     flash_models = [m for m in discovered if "flash" in m.lower()]
     other_models = [m for m in discovered if "flash" not in m.lower() and "gemini" in m.lower()]
     candidates = flash_models + other_models
     if not candidates and discovered:
         candidates = discovered
     if not candidates:
-        candidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-pro"]
+        candidates = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
 
     _GEMINI_MODEL_CACHE[clean_key] = candidates
     return candidates
@@ -227,27 +241,40 @@ def generate_gemini_explanation(file_tree: List[str], code_files: Dict[str, str]
 
     errors: List[str] = []
     for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={clean_key}"
-        try:
-            resp = requests.post(url, json=payload, timeout=25)
-            if resp.status_code == 200:
-                data = resp.json()
-                if isinstance(data, dict):
-                    candidates = data.get("candidates", [])
-                    if isinstance(candidates, list) and len(candidates) > 0:
-                        candidate = candidates[0]
-                        if isinstance(candidate, dict):
-                            content = candidate.get("content", {})
-                            if isinstance(content, dict):
-                                parts = content.get("parts", [])
-                                if isinstance(parts, list) and len(parts) > 0:
-                                    part = parts[0]
-                                    if isinstance(part, dict):
-                                        text = part.get("text", "")
-                                        if text and isinstance(text, str) and text.strip():
-                                            return text.strip()
-            errors.append(f"{model_name} (HTTP {resp.status_code})")
-        except Exception as exc:
-            errors.append(f"{model_name} (error: {str(exc)})")
+        for api_version in ["v1beta", "v1"]:
+            url = f"https://generativelanguage.googleapis.com/{api_version}/models/{model_name}:generateContent?key={clean_key}"
+            try:
+                resp = requests.post(url, json=payload, timeout=25)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if isinstance(data, dict):
+                        candidates = data.get("candidates", [])
+                        if isinstance(candidates, list) and len(candidates) > 0:
+                            candidate = candidates[0]
+                            if isinstance(candidate, dict):
+                                content = candidate.get("content", {})
+                                if isinstance(content, dict):
+                                    parts = content.get("parts", [])
+                                    if isinstance(parts, list) and len(parts) > 0:
+                                        part = parts[0]
+                                        if isinstance(part, dict):
+                                            text = part.get("text", "")
+                                            if text and isinstance(text, str) and text.strip():
+                                                return text.strip()
+                elif resp.status_code in (400, 403):
+                    try:
+                        err_json = resp.json()
+                        err_msg = err_json.get("error", {}).get("message", "")
+                        if "API_KEY_INVALID" in str(err_json) or "API key not valid" in err_msg:
+                            raise RuntimeError(f"Google API Key invalid or expired: {err_msg}. Please update GEMINI_API_KEY in Streamlit Secrets.")
+                    except RuntimeError:
+                        raise
+                    except Exception:
+                        pass
+                errors.append(f"{model_name}/{api_version} (HTTP {resp.status_code})")
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                errors.append(f"{model_name}/{api_version} (error: {str(exc)})")
 
     raise RuntimeError(f"Cloud AI failed on models: {', '.join(errors)}")
